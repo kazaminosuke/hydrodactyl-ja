@@ -22,7 +22,7 @@ import { ServerContext } from '@/state/server';
 
 import { useUnifiedBackups } from './useUnifiedBackups';
 import BackupStats from './components/BackupStats';
-import BulkActionBar from './components/BulkActionBar';
+// import BulkActionBar from './components/BulkActionBar';
 import ConfirmPasswordModal from './components/ConfirmPasswordModal';
 import CreateBackupModal from './components/CreateBackupModal';
 
@@ -170,164 +170,151 @@ const BackupContainer = () => {
         clearAndAddHttpError({ error, key: 'backups' });
     }, [error]);
 
-    if (!backups || (error && isValidating)) {
-        return (
-            <ServerContentBlock title={'Backups'}>
-                <FlashMessageRender byKey={'backups'} />
-                <MainPageHeader direction='column' title={'Backups'}>
-                    <p className='text-sm text-neutral-400 leading-relaxed'>
-                        Create and manage server backups to protect your data. Schedule automated backups, download
-                        existing ones, and restore when needed.
-                    </p>
-                </MainPageHeader>
+    const isLoading = !backups || (error && isValidating);
+
+    return (
+        <ServerContentBlock className='p-0!' title={'Backups'}>
+            <FlashMessageRender byKey={'backups'} />
+            {isLoading ? (
                 <div className='flex items-center justify-center py-12'>
                     <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-brand'></div>
                 </div>
-            </ServerContentBlock>
-        );
-    }
-
-    return (
-        <ServerContentBlock title={'Backups'}>
-            <FlashMessageRender byKey={'backups'} />
-            <Can action={'backup.create'}>
-                <div className='flex flex-col pb-2 sm:flex-row items-center gap-4'>
-                    <div className='flex gap-2'>
-                        {backupCount > 0 && (
-                            <Button
-                                variant='secondary'
-                                onClick={() => setDeleteAllModalVisible(true)}
-                                disabled={hasActiveOperation}
-                            >
-                                <svg
-                                    className='w-4 h-4 mr-2'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'
-                                >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
-                                    />
-                                </svg>
-                                Delete All
-                            </Button>
-                        )}
-                        {(backupLimit === null || backupLimit > backupCount) &&
-                            (!backupStorageLimit || !storage?.is_over_limit) && (
-                                <Button
-                                    variant='secondary'
-                                    className='gap-2'
-                                    onClick={() => setCreateModalVisible(true)}
-                                    disabled={hasActiveOperation}
-                                >
-                                    <Plus width={22} height={22} className='w-4 h-4' fill='currentColor' />
-                                    New Backup
-                                </Button>
-                            )}
-                    </div>
-                    <BackupStats
-                        backupCount={backupCount}
-                        backupLimit={backupLimit}
-                        storage={storage}
-                        backupStorageLimit={backupStorageLimit}
-                    />
-                </div>
-            </Can>
-
-            {createModalVisible && (
-                <CreateBackupModal
-                    visible={createModalVisible}
-                    onDismissed={() => setCreateModalVisible(false)}
-                    onSubmit={submitBackup}
-                />
-            )}
-
-            <ConfirmPasswordModal
-                open={deleteAllModalVisible}
-                onClose={() => setDeleteAllModalVisible(false)}
-                onConfirmed={handleDeleteAll}
-                title='Delete All Backups'
-                flashKey='backups'
-                loading={isDeleting}
-                description={`You are about to permanently delete ${backupCount} ${backupCount === 1 ? 'backup' : 'backups'} and completely destroy the backup repository for this server.`}
-                warningItems={[
-                    'All backup data will be permanently deleted',
-                    'Locked backups will also be deleted',
-                    'The entire backup repository will be destroyed',
-                    'This operation may take several minutes to complete',
-                    'You will not be able to restore any of these backups',
-                ]}
-                confirmText='Delete All Backups'
-            />
-
-            <ConfirmPasswordModal
-                open={bulkDeleteModalVisible}
-                onClose={() => setBulkDeleteModalVisible(false)}
-                onConfirmed={handleBulkDelete}
-                title='Delete Selected Backups'
-                flashKey='backups:bulk_delete'
-                loading={isBulkDeleting}
-                description={`You are about to permanently delete ${selectedBackups.size} backup${selectedBackups.size > 1 ? 's' : ''}. This action cannot be undone.`}
-                warningItems={['The selected backup files and their snapshots will be permanently deleted. You will not be able to restore them.']}
-                confirmText={`Delete ${selectedBackups.size} Backup${selectedBackups.size > 1 ? 's' : ''}`}
-            />
-
-            {backups.length === 0 ? (
-                <div className='flex flex-col items-center justify-center min-h-[60vh] py-12 px-4'>
-                    <div className='text-center'>
-                        <div className='w-16 h-16 mx-auto mb-4 rounded-full bg-[#ffffff11] flex items-center justify-center'>
-                            <ArrowDownToLine
-                                width={22}
-                                height={22}
-                                className='w-6 h-6 text-zinc-400'
-                                fill=' currentColor'
-                            />
-                        </div>
-                        <h3 className='text-lg font-medium text-zinc-200 mb-2'>
-                            {backupLimit === 0 ? 'Backups unavailable' : 'No backups found'}
-                        </h3>
-                        <p className='text-sm text-zinc-400 max-w-sm'>
-                            {backupLimit === 0
-                                ? 'Backups cannot be created for this server.'
-                                : 'Your server does not have any backups. Create one to get started.'}
-                        </p>
-                    </div>
-                </div>
             ) : (
                 <>
-                    <BulkActionBar
-                        selectableBackups={selectableBackups}
-                        selectedBackups={selectedBackups}
-                        onSelectAll={toggleSelectAll}
-                        onClear={() => setSelectedBackups(new Set())}
-                        onDeleteSelected={() => setBulkDeleteModalVisible(true)}
+                    <Can action={'backup.create'}>
+                        <div className='px-2 pt-2 sm:px-14 sm:pt-14 flex flex-col sm:flex-row items-center gap-4'>
+                            <div className='flex gap-2'>
+                                {backupCount > 0 && (
+                                    <Button
+                                        variant='secondary'
+                                        onClick={() => setDeleteAllModalVisible(true)}
+                                        disabled={hasActiveOperation}
+                                    >
+                                        <svg
+                                            className='w-4 h-4 mr-2'
+                                            fill='none'
+                                            viewBox='0 0 24 24'
+                                            stroke='currentColor'
+                                        >
+                                            <path
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                                strokeWidth={2}
+                                                d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+                                            />
+                                        </svg>
+                                        Delete All
+                                    </Button>
+                                )}
+                                {(backupLimit === null || backupLimit > backupCount) &&
+                                    (!backupStorageLimit || !storage?.is_over_limit) && (
+                                        <Button
+                                            variant='secondary'
+                                            className='gap-2'
+                                            onClick={() => setCreateModalVisible(true)}
+                                            disabled={hasActiveOperation}
+                                        >
+                                            <Plus width={22} height={22} className='w-4 h-4' fill='currentColor' />
+                                            New Backup
+                                        </Button>
+                                    )}
+                            </div>
+                            <BackupStats
+                                backupCount={backupCount}
+                                backupLimit={backupLimit}
+                                storage={storage}
+                                backupStorageLimit={backupStorageLimit}
+                            />
+                        </div>
+                    </Can>
+
+                    {createModalVisible && (
+                        <CreateBackupModal
+                            visible={createModalVisible}
+                            onDismissed={() => setCreateModalVisible(false)}
+                            onSubmit={submitBackup}
+                        />
+                    )}
+
+                    <ConfirmPasswordModal
+                        open={deleteAllModalVisible}
+                        onClose={() => setDeleteAllModalVisible(false)}
+                        onConfirmed={handleDeleteAll}
+                        title='Delete All Backups'
+                        flashKey='backups'
+                        loading={isDeleting}
+                        description={`You are about to permanently delete ${backupCount} ${backupCount === 1 ? 'backup' : 'backups'} and completely destroy the backup repository for this server.`}
+                        warningItems={[
+                            'All backup data will be permanently deleted',
+                            'Locked backups will also be deleted',
+                            'The entire backup repository will be destroyed',
+                            'This operation may take several minutes to complete',
+                            'You will not be able to restore any of these backups',
+                        ]}
+                        confirmText='Delete All Backups'
                     />
 
-                    <PageListContainer>
-                        {backups.map((backup) =>
-                            daemonType === 'elytra' ? (
-                                <BackupItemElytra
-                                    key={backup.uuid}
-                                    backup={backup}
-                                    isSelected={selectedBackups.has(backup.uuid)}
-                                    onToggleSelect={() => toggleBackupSelection(backup.uuid)}
-                                    isSelectable={selectableBackups.some((b) => b.uuid === backup.uuid)}
-                                    retryBackup={retryBackup}
-                                />
-                            ) : (
-                                <BackupItemWings key={backup.uuid} backup={backup} />
-                            ),
-                        )}
-                    </PageListContainer>
+                    <ConfirmPasswordModal
+                        open={bulkDeleteModalVisible}
+                        onClose={() => setBulkDeleteModalVisible(false)}
+                        onConfirmed={handleBulkDelete}
+                        title='Delete Selected Backups'
+                        flashKey='backups:bulk_delete'
+                        loading={isBulkDeleting}
+                        description={`You are about to permanently delete ${selectedBackups.size} backup${selectedBackups.size > 1 ? 's' : ''}. This action cannot be undone.`}
+                        warningItems={['The selected backup files and their snapshots will be permanently deleted. You will not be able to restore them.']}
+                        confirmText={`Delete ${selectedBackups.size} Backup${selectedBackups.size > 1 ? 's' : ''}`}
+                    />
 
-                    {pagination && pagination.currentPage && pagination.totalPages && pagination.totalPages > 1 && (
-                        <Pagination data={{ items: backups, pagination }} onPageSelect={setPage}>
-                            {() => null}
-                        </Pagination>
-                    )}
+                    <div className='px-2 sm:px-14'>
+                        {backups.length === 0 ? (
+                            <div className='flex flex-col items-center justify-center min-h-[60vh] py-12 px-4'>
+                                <div className='text-center'>
+                                    <div className='w-16 h-16 mx-auto mb-4 rounded-full bg-[#ffffff11] flex items-center justify-center'>
+                                        <ArrowDownToLine
+                                            width={22}
+                                            height={22}
+                                            className='w-6 h-6 text-zinc-400'
+                                            fill=' currentColor'
+                                        />
+                                    </div>
+                                    <h3 className='text-lg font-medium text-zinc-200 mb-2'>
+                                        {backupLimit === 0 ? 'Backups unavailable' : 'No backups found'}
+                                    </h3>
+                                    <p className='text-sm text-zinc-400 max-w-sm'>
+                                        {backupLimit === 0
+                                            ? 'Backups cannot be created for this server.'
+                                            : 'Your server does not have any backups. Create one to get started.'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <PageListContainer>
+                                    {backups.map((backup) =>
+                                        daemonType === 'elytra' ? (
+                                            <BackupItemElytra
+                                                key={backup.uuid}
+                                                backup={backup}
+                                                isSelected={selectedBackups.has(backup.uuid)}
+                                                onToggleSelect={() => toggleBackupSelection(backup.uuid)}
+                                                isSelectable={selectableBackups.some((b) => b.uuid === backup.uuid)}
+                                                retryBackup={retryBackup}
+                                            />
+                                        ) : (
+                                            <BackupItemWings key={backup.uuid} backup={backup} />
+                                        ),
+                                    )}
+                                </PageListContainer>
+
+                                {pagination && pagination.currentPage && pagination.totalPages && pagination.totalPages > 1 && (
+                                    <Pagination data={{ items: backups, pagination }} onPageSelect={setPage}>
+                                        {() => null}
+                                    </Pagination>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </>
             )}
         </ServerContentBlock>
