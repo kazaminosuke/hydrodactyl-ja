@@ -1,33 +1,28 @@
 import { ArrowDownToLine, Plus } from '@gravity-ui/icons';
 import { useStoreState } from 'easy-peasy';
 import { type FormikHelpers } from 'formik';
-import { createContext, lazy, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import deleteAllServerBackups from '@/api/server/backups/deleteAllServerBackups';
-import { getGlobalDaemonType } from '@/api/server/getServer';
 import getServerBackups, { Context as ServerBackupContext } from '@/api/swr/getServerBackups';
 import ActionButton from '@/components/elements/ActionButton';
-import { Button } from '@/components/ui/button';
 import Can from '@/components/elements/Can';
-import { MainPageHeader } from '@/components/elements/MainPageHeader';
 import Pagination from '@/components/elements/Pagination';
-import { PageListContainer } from '@/components/elements/pages/PageList';
 import ServerContentBlock from '@/components/elements/ServerContentBlock';
+import VirtualizedList from '@/components/elements/VirtualizedList';
 import FlashMessageRender from '@/components/FlashMessageRender';
 import { SocketEvent } from '@/components/server/events';
+import { Button } from '@/components/ui/button';
 import useFlash from '@/plugins/useFlash';
 import useWebsocketEvent from '@/plugins/useWebsocketEvent';
 import type { ApplicationStore } from '@/state';
 import { ServerContext } from '@/state/server';
-
-import { useUnifiedBackups } from './useUnifiedBackups';
+import BackupItem from './BackupItem';
 import BackupStats from './components/BackupStats';
 // import BulkActionBar from './components/BulkActionBar';
 import ConfirmPasswordModal from './components/ConfirmPasswordModal';
 import CreateBackupModal from './components/CreateBackupModal';
-
-const BackupItemElytra = lazy(() => import('./elytra/BackupItem'));
-const BackupItemWings = lazy(() => import('./wings/BackupItem'));
+import { useUnifiedBackups } from './useUnifiedBackups';
 
 // Context to share live backup progress across components
 export const LiveProgressContext = createContext<
@@ -64,7 +59,6 @@ const BackupContainer = () => {
     const [selectedBackups, setSelectedBackups] = useState<Set<string>>(new Set());
     const [bulkDeleteModalVisible, setBulkDeleteModalVisible] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-    const daemonType = getGlobalDaemonType();
 
     const hasTwoFactor = useStoreState((state: ApplicationStore) => state.user.data?.useTotp || false);
 
@@ -101,9 +95,7 @@ const BackupContainer = () => {
             toast.success('All backups and repositories are being deleted. This may take a few minutes.');
             setDeleteAllModalVisible(false);
         } catch (error) {
-            toast.error(
-                error instanceof Error ? error.message : 'Failed to delete backups.',
-            );
+            toast.error(error instanceof Error ? error.message : 'Failed to delete backups.');
         } finally {
             setIsDeleting(false);
         }
@@ -150,7 +142,7 @@ const BackupContainer = () => {
         });
     };
 
-    const toggleSelectAll = () => {
+    const _toggleSelectAll = () => {
         const selectableBackups = backups.filter((b) => b.status === 'completed' && b.isSuccessful && !b.isLiveOnly);
         if (selectedBackups.size === selectableBackups.length) {
             setSelectedBackups(new Set());
@@ -168,7 +160,7 @@ const BackupContainer = () => {
             return;
         }
         clearAndAddHttpError({ error, key: 'backups' });
-    }, [error]);
+    }, [error, clearAndAddHttpError, clearFlashes]);
 
     const isLoading = !backups || (error && isValidating);
 
@@ -262,7 +254,9 @@ const BackupContainer = () => {
                         flashKey='backups:bulk_delete'
                         loading={isBulkDeleting}
                         description={`You are about to permanently delete ${selectedBackups.size} backup${selectedBackups.size > 1 ? 's' : ''}. This action cannot be undone.`}
-                        warningItems={['The selected backup files and their snapshots will be permanently deleted. You will not be able to restore them.']}
+                        warningItems={[
+                            'The selected backup files and their snapshots will be permanently deleted. You will not be able to restore them.',
+                        ]}
                         confirmText={`Delete ${selectedBackups.size} Backup${selectedBackups.size > 1 ? 's' : ''}`}
                     />
 
@@ -290,28 +284,30 @@ const BackupContainer = () => {
                             </div>
                         ) : (
                             <>
-                                <PageListContainer>
-                                    {backups.map((backup) =>
-                                        daemonType === 'elytra' ? (
-                                            <BackupItemElytra
-                                                key={backup.uuid}
-                                                backup={backup}
-                                                isSelected={selectedBackups.has(backup.uuid)}
-                                                onToggleSelect={() => toggleBackupSelection(backup.uuid)}
-                                                isSelectable={selectableBackups.some((b) => b.uuid === backup.uuid)}
-                                                retryBackup={retryBackup}
-                                            />
-                                        ) : (
-                                            <BackupItemWings key={backup.uuid} backup={backup} />
-                                        ),
+                                <VirtualizedList
+                                    items={backups}
+                                    renderItem={(backup) => (
+                                        <BackupItem
+                                            backup={backup}
+                                            isSelected={selectedBackups.has(backup.uuid)}
+                                            onToggleSelect={() => toggleBackupSelection(backup.uuid)}
+                                            isSelectable={selectableBackups.some((b) => b.uuid === backup.uuid)}
+                                            retryBackup={retryBackup}
+                                        />
                                     )}
-                                </PageListContainer>
+                                    estimateSize={() => 120}
+                                    gap={12}
+                                    className='pt-4'
+                                />
 
-                                {pagination && pagination.currentPage && pagination.totalPages && pagination.totalPages > 1 && (
-                                    <Pagination data={{ items: backups, pagination }} onPageSelect={setPage}>
-                                        {() => null}
-                                    </Pagination>
-                                )}
+                                {pagination &&
+                                    pagination.currentPage &&
+                                    pagination.totalPages &&
+                                    pagination.totalPages > 1 && (
+                                        <Pagination data={{ items: backups, pagination }} onPageSelect={setPage}>
+                                            {() => null}
+                                        </Pagination>
+                                    )}
                             </>
                         )}
                     </div>
@@ -350,7 +346,7 @@ const BackupContainerWrapper = () => {
                 } else {
                     data = rawData;
                 }
-            } catch (error) {
+            } catch (_error) {
                 return;
             }
 

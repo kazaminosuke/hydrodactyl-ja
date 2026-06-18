@@ -8,17 +8,17 @@ import deleteApiKey from '@/api/account/deleteApiKey';
 import getApiKeys, { type ApiKey } from '@/api/account/getApiKeys';
 import { httpErrorToHuman } from '@/api/http';
 import ApiKeyModal from '@/components/dashboard/ApiKeyModal';
-import { Button } from '@/components/ui/button';
 import Code from '@/components/elements/Code';
+import CopyOnClick from '@/components/elements/CopyOnClick';
 import { Dialog } from '@/components/elements/dialog';
 import PageContentBlock from '@/components/elements/PageContentBlock';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
+import VirtualizedList from '@/components/elements/VirtualizedList';
 import FlashMessageRender from '@/components/FlashMessageRender';
+import { Button } from '@/components/ui/button';
 import { useFlashKey } from '@/plugins/useFlash';
 import type { ApplicationStore } from '@/state';
-
 import ServerHeader from '../HeaderManger';
-import CopyOnClick from '@/components/elements/CopyOnClick';
 
 const CreateApiKeyModal = lazy(() => import('./CreateApiKeyModal'));
 
@@ -124,102 +124,82 @@ const AccountApiContainer = () => {
                             </Button>
                         </div>
 
-                        {keys.length === 0 ? (
-                            <div className='text-center py-12'>
-                                <div className='w-16 h-16 mx-auto mb-4 rounded-full bg-mocha-400 flex items-center justify-center'>
-                                    <Key width={22} height={22} className='text-zinc-400' fill='currentColor' />
-                                </div>
-                                <h3 className='text-lg font-medium text-zinc-200 mb-2'>No API Keys</h3>
-                                <p className='text-sm text-zinc-400 max-w-sm mx-auto'>
-                                    {loading
-                                        ? 'Loading your API keys...'
-                                        : "You haven't created any API keys yet. Create one to get started with the API."}
-                                </p>
-                            </div>
-                        ) : (
-                            <div className='space-y-3'>
-                                {keys.map((key, index) => (
-                                    <div
-                                        key={key.identifier}
-                                        className='transform-gpu skeleton-anim-2'
-                                        style={{
-                                            animationDelay: `${index * 25 + 100}ms`,
-                                            animationTimingFunction:
-                                                'linear(0,0.01,0.04 1.6%,0.161 3.3%,0.816 9.4%,1.046,1.189 14.4%,1.231,1.254 17%,1.259,1.257 18.6%,1.236,1.194 22.3%,1.057 27%,0.999 29.4%,0.955 32.1%,0.942,0.935 34.9%,0.933,0.939 38.4%,1 47.3%,1.011,1.017 52.6%,1.016 56.4%,1 65.2%,0.996 70.2%,1.001 87.2%,1)',
-                                        }}
-                                    >
-                                        <div className='bg-mocha-500 border-mocha-300 border-[1px] rounded-lg transition-all duration-150 p-4'>
-                                            <div className='flex items-center justify-between'>
-                                                <div className='flex-1 min-w-0'>
-                                                    <div className='flex items-center gap-3 mb-2'>
-                                                        <h4 className='text-sm font-medium text-text truncate'>
-                                                            {key.description}
-                                                        </h4>
-                                                    </div>
-                                                    <div className='flex items-center gap-4 text-xs font-large text-text/20'>
-                                                        <span>
-                                                            Last used:{' '}
-                                                            {key.lastUsedAt
-                                                                ? format(key.lastUsedAt, 'MMM d, yyyy HH:mm')
-                                                                : 'Never'}
-                                                        </span>
-                                                        <div className='flex items-center gap-2 hover:cursor-pointer'>
-                                                            <span>Key:</span>
+                        <VirtualizedList
+                            items={keys}
+                            renderItem={(key) => (
+                                <div className='flex items-center justify-between'>
+                                    <div className='flex-1 min-w-0'>
+                                        <div className='flex items-center gap-3 mb-2'>
+                                            <h4 className='text-sm font-medium text-text truncate'>
+                                                {key.description}
+                                            </h4>
+                                        </div>
+                                        <div className='flex items-center gap-4 text-xs font-large text-text/20'>
+                                            <span>
+                                                Last used:{' '}
+                                                {key.lastUsedAt ? format(key.lastUsedAt, 'MMM d, yyyy HH:mm') : 'Never'}
+                                            </span>
+                                            <div className='flex items-center gap-2 hover:cursor-pointer'>
+                                                <span>Key:</span>
 
-                                                            <code className='font-mono px-2 py-1 bg-mocha-400 border border-mocha-200 rounded text-zinc-300 flex'>
-                                                                <span className='flex items-center gap-1'>
-                                                                    {showKeys[key.identifier] ? (
-                                                                        <EyeSlash
-                                                                            onClick={() =>
-                                                                                toggleKeyVisibility(key.identifier)
-                                                                            }
-                                                                            width={18}
-                                                                            height={18}
-                                                                            fill='currentColor'
-                                                                        />
-                                                                    ) : (
-                                                                        <Eye
-                                                                            onClick={() =>
-                                                                                toggleKeyVisibility(key.identifier)
-                                                                            }
-                                                                            width={18}
-                                                                            height={18}
-                                                                            fill='currentColor'
-                                                                        />
-                                                                    )}
-                                                                    {showKeys[key.identifier] ? (
-                                                                        <CopyOnClick text={key.identifier}>
-                                                                            <pre>{key.identifier}</pre>
-                                                                        </CopyOnClick>
-                                                                    ) : (
-                                                                        <span
-                                                                            onClick={() =>
-                                                                                toggleKeyVisibility(key.identifier)
-                                                                            }
-                                                                        >
-                                                                            ••••••••••••••••
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                            </code>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    variant='attention'
-                                                    size='sm'
-                                                    className='ml-4'
-                                                    onClick={() => setDeleteIdentifier(key.identifier)}
-                                                >
-                                                    <TrashBin width={20} height={20} fill='currentColor' />
-                                                </Button>
+                                                <code className='font-mono px-2 py-1 bg-mocha-400 border border-mocha-200 rounded text-zinc-300 flex'>
+                                                    <span className='flex items-center gap-1'>
+                                                        {showKeys[key.identifier] ? (
+                                                            <EyeSlash
+                                                                onClick={() => toggleKeyVisibility(key.identifier)}
+                                                                width={18}
+                                                                height={18}
+                                                                fill='currentColor'
+                                                            />
+                                                        ) : (
+                                                            <Eye
+                                                                onClick={() => toggleKeyVisibility(key.identifier)}
+                                                                width={18}
+                                                                height={18}
+                                                                fill='currentColor'
+                                                            />
+                                                        )}
+                                                        {showKeys[key.identifier] ? (
+                                                            <CopyOnClick text={key.identifier}>
+                                                                <pre>{key.identifier}</pre>
+                                                            </CopyOnClick>
+                                                        ) : (
+                                                            <span onClick={() => toggleKeyVisibility(key.identifier)}>
+                                                                ••••••••••••••••
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </code>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+
+                                    <Button
+                                        variant='attention'
+                                        size='sm'
+                                        className='ml-4'
+                                        onClick={() => setDeleteIdentifier(key.identifier)}
+                                    >
+                                        <TrashBin width={20} height={20} fill='currentColor' />
+                                    </Button>
+                                </div>
+                            )}
+                            estimateSize={() => 80}
+                            gap={12}
+                            loading={loading}
+                            loadingOverlay={null}
+                            emptyState={
+                                <div className='text-center py-12'>
+                                    <div className='w-16 h-16 mx-auto mb-4 rounded-full bg-mocha-400 flex items-center justify-center'>
+                                        <Key width={22} height={22} className='text-zinc-400' fill='currentColor' />
+                                    </div>
+                                    <h3 className='text-lg font-medium text-zinc-200 mb-2'>No API Keys</h3>
+                                    <p className='text-sm text-zinc-400 max-w-sm mx-auto'>
+                                        You haven't created any API keys yet. Create one to get started with the API.
+                                    </p>
+                                </div>
+                            }
+                        />
                     </div>
                 </div>
             </div>

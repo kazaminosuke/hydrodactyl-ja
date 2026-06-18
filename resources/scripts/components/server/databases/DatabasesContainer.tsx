@@ -89,7 +89,7 @@ const DatabasesContainer = () => {
                     <Can action={'database.create'}>
                         <Button variant='secondary' onClick={() => setCreateModalVisible(true)} className='flex items-center gap-2'
                         >
-                            <Plus width={22} height={22} fill='currentColor' />
+                            <Plus width={22} height={22} className='w-4 h-4' fill='currentColor' />
                             New Database
                         </Button>
                     </Can>

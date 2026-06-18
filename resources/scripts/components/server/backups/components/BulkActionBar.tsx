@@ -1,7 +1,7 @@
 import ActionButton from '@/components/elements/ActionButton';
 import Can from '@/components/elements/Can';
 import { Checkbox } from '@/components/elements/CheckboxNew';
-import type { UnifiedBackup } from '../elytra/BackupItem';
+import type { UnifiedBackup } from '../types';
 
 interface BulkActionBarProps {
     selectableBackups: UnifiedBackup[];

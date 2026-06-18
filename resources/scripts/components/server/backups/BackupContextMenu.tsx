@@ -1,17 +1,9 @@
-import {
-    ArrowDownToLine,
-    Bars,
-    CloudArrowUpIn,
-    Pencil,
-    Shield,
-    TrashBin,
-} from '@gravity-ui/icons';
+import { ArrowDownToLine, Bars, CloudArrowUpIn, Pencil, Shield, TrashBin } from '@gravity-ui/icons';
 import { useStoreState } from 'easy-peasy';
 import { useEffect, useState } from 'react';
 import http, { httpErrorToHuman } from '@/api/http';
 import { getServerBackupDownloadUrl } from '@/api/server/backups';
 import { getGlobalDaemonType } from '@/api/server/getServer';
-import type { ServerBackup } from '@/api/server/types';
 import ActionButton from '@/components/elements/ActionButton';
 import Can from '@/components/elements/Can';
 import {
@@ -26,11 +18,12 @@ import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
 import useFlash from '@/plugins/useFlash';
 import type { ApplicationStore } from '@/state';
 import { ServerContext } from '@/state/server';
-import { useUnifiedBackups } from '../useUnifiedBackups';
-import ConfirmPasswordModal from '../components/ConfirmPasswordModal';
+import ConfirmPasswordModal from './components/ConfirmPasswordModal';
+import type { BackupContextMenuBackup } from './types';
+import { useUnifiedBackups } from './useUnifiedBackups';
 
 interface Props {
-    backup: ServerBackup;
+    backup: BackupContextMenuBackup;
 }
 
 const BackupContextMenu = ({ backup }: Props) => {
