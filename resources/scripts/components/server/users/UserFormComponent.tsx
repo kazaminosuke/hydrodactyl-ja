@@ -29,6 +29,22 @@ interface Props {
     setIsSubmitting?: (submitting: boolean) => void;
 }
 
+const ICON_MAP: Record<string, typeof Shield> = {
+    control: Server,
+    user: Person,
+    file: FolderOpen,
+    backup: Copy,
+    allocation: AntennaSignal,
+    startup: Gear,
+    database: Database,
+    schedule: Calendar,
+};
+
+const PermissionIcon = ({ name }: { name: string }) => {
+    const Icon = ICON_MAP[name] ?? Shield;
+    return <Icon width={22} height={22} fill='currentColor' className='text-brand flex-shrink-0 mt-0.5' />;
+};
+
 const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmitting, setIsSubmitting }: Props) => {
     const uuid = ServerContext.useStoreState((state) => state.server.data!.uuid);
     const appendSubuser = ServerContext.useStoreActions((actions) => actions.subusers.appendSubuser);
@@ -41,35 +57,28 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
     const loggedInPermissions = ServerContext.useStoreState((state) => state.server.permissions);
     const [canEditUser] = usePermissions(subuser ? ['user.update'] : ['user.create']);
 
-    // The permissions that can be modified by this user.
     const editablePermissions = useDeepCompareMemo(() => {
-        const cleaned = Object.keys(permissions).map((key) =>
+        const list = Object.keys(permissions).flatMap((key) =>
             Object.keys(permissions[key]?.keys ?? {}).map((pkey) => `${key}.${pkey}`),
         );
-
-        const list: string[] = ([] as string[]).concat.apply([], Object.values(cleaned));
-
         if (isRootAdmin || (loggedInPermissions.length === 1 && loggedInPermissions[0] === '*')) {
             return list;
         }
-
         return list.filter((key) => loggedInPermissions.indexOf(key) >= 0);
     }, [isRootAdmin, permissions, loggedInPermissions]);
 
-    const submit = (values: Values) => {
+    const submit = async (values: Values) => {
         if (setIsSubmitting) setIsSubmitting(true);
         clearFlashes(flashKey);
-
-        createOrUpdateSubuser(uuid, values, subuser)
-            .then((subuser) => {
-                appendSubuser(subuser);
-                onSuccess(subuser);
-            })
-            .catch((error) => {
-                console.error(error);
-                if (setIsSubmitting) setIsSubmitting(false);
-                clearAndAddHttpError({ key: flashKey, error });
-            });
+        try {
+            const created = await createOrUpdateSubuser(uuid, values, subuser);
+            appendSubuser(created);
+            onSuccess(created);
+        } catch (error) {
+            console.error(error);
+            if (setIsSubmitting) setIsSubmitting(false);
+            clearAndAddHttpError({ key: flashKey, error });
+        }
     };
 
     useEffect(
@@ -79,26 +88,35 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
         [],
     );
 
-    const getPermissionIcon = (key: string) => {
-        switch (key) {
-            case 'control':
-                return Server;
-            case 'user':
-                return Person;
-            case 'file':
-                return FolderOpen;
-            case 'backup':
-                return Copy;
-            case 'allocation':
-                return AntennaSignal;
-            case 'startup':
-                return Gear;
-            case 'database':
-                return Database;
-            case 'schedule':
-                return Calendar;
-            default:
-                return Shield;
+    const getCategoryKeys = (key: string) => Object.keys(permissions[key]?.keys ?? {});
+    const getCategoryPermissions = (key: string) => getCategoryKeys(key).map((pkey) => `${key}.${pkey}`);
+
+    const toggleAll = (values: Values, setFieldValue: (field: string, value: unknown) => void) => {
+        const allPermissions = editablePermissions;
+        const allSelected = allPermissions.every((p) => values.permissions.includes(p));
+        setFieldValue('permissions', allSelected ? [] : [...allPermissions]);
+    };
+
+    const toggleCategory = (
+        key: string,
+        values: Values,
+        setFieldValue: (field: string, value: unknown) => void,
+    ) => {
+        const categoryPermissions = getCategoryPermissions(key);
+        const allSelected = categoryPermissions.every((p) => values.permissions.includes(p));
+        if (allSelected) {
+            setFieldValue(
+                'permissions',
+                values.permissions.filter((p) => !categoryPermissions.includes(p)),
+            );
+        } else {
+            const newPermissions = [...values.permissions];
+            categoryPermissions.forEach((p) => {
+                if (!newPermissions.includes(p) && editablePermissions.includes(p)) {
+                    newPermissions.push(p);
+                }
+            });
+            setFieldValue('permissions', newPermissions);
         }
     };
 
@@ -122,9 +140,12 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                     permissions: array().of(string()),
                 })}
             >
-                {({ setFieldValue, values }) => (
+                {({ setFieldValue, values }) => {
+                    const allSelected = editablePermissions.every((p) => values.permissions.includes(p));
+                    const isCategoryAllSelected = (key: string) =>
+                        getCategoryPermissions(key).every((p) => values.permissions.includes(p));
+                    return (
                     <Form className='space-y-6'>
-                        {/* User Information Section */}
                         {!subuser && (
                             <div className='bg-gradient-to-b from-[#ffffff08] to-[#ffffff05] border border-[#ffffff12] rounded-xl p-6'>
                                 <div className='flex items-center gap-3 mb-6'>
@@ -139,16 +160,13 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                                     <h3 className='text-xl font-semibold text-zinc-100'>User Information</h3>
                                 </div>
                                 <Field
-                                    name={'email'}
-                                    label={'Email Address'}
-                                    description={
-                                        'Enter the email address of the user you wish to invite as a subuser for this server.'
-                                    }
+                                    name='email'
+                                    label='Email Address'
+                                    description='Enter the email address of the user you wish to invite as a subuser for this server.'
                                 />
                             </div>
                         )}
 
-                        {/* Permissions Section */}
                         <div className='bg-gradient-to-b from-[#ffffff08] to-[#ffffff05] border border-[#ffffff12] rounded-xl p-6'>
                             <div className='flex items-center justify-between mb-6'>
                                 <div className='flex items-center gap-3'>
@@ -167,21 +185,9 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                                         variant='secondary'
                                         size='sm'
                                         type='button'
-                                        onClick={() => {
-                                            const allPermissions = editablePermissions;
-                                            const allSelected = allPermissions.every((p) =>
-                                                values.permissions.includes(p),
-                                            );
-                                            if (allSelected) {
-                                                setFieldValue('permissions', []);
-                                            } else {
-                                                setFieldValue('permissions', [...allPermissions]);
-                                            }
-                                        }}
+                                        onClick={() => toggleAll(values, setFieldValue)}
                                     >
-                                        {editablePermissions.every((p) => values.permissions.includes(p))
-                                            ? 'Deselect All'
-                                            : 'Select All'}
+                                        {allSelected ? 'Deselect All' : 'Select All'}
                                     </Button>
                                 )}
                             </div>
@@ -210,17 +216,7 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                                         <div key={key} className='border border-[#ffffff12] rounded-lg p-4'>
                                             <div className='flex items-start justify-between mb-3'>
                                                 <div className='flex items-start gap-3 flex-1 min-w-0'>
-                                                    {(() => {
-                                                        const Icon = getPermissionIcon(key);
-                                                        return (
-                                                            <Icon
-                                                                width={22}
-                                                                height={22}
-                                                                fill='currentColor'
-                                                                className=' text-brand flex-shrink-0 mt-0.5'
-                                                            />
-                                                        );
-                                                    })()}
+                                                    <PermissionIcon name={key} />
                                                     <div className='flex-1 min-w-0'>
                                                         <h4 className='font-medium text-zinc-200 capitalize'>{key}</h4>
                                                         <p className='text-xs text-zinc-400 mt-1 break-words'>
@@ -233,51 +229,21 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                                                         variant='secondary'
                                                         size='sm'
                                                         type='button'
-                                                        onClick={() => {
-                                                            const categoryPermissions = Object.keys(
-                                                                permissions[key]?.keys ?? {},
-                                                            ).map((pkey) => `${key}.${pkey}`);
-                                                            const allSelected = categoryPermissions.every((p) =>
-                                                                values.permissions.includes(p),
-                                                            );
-                                                            if (allSelected) {
-                                                                setFieldValue(
-                                                                    'permissions',
-                                                                    values.permissions.filter(
-                                                                        (p) => !categoryPermissions.includes(p),
-                                                                    ),
-                                                                );
-                                                            } else {
-                                                                const newPermissions = [...values.permissions];
-                                                                categoryPermissions.forEach((p) => {
-                                                                    if (
-                                                                        !newPermissions.includes(p) &&
-                                                                        editablePermissions.includes(p)
-                                                                    ) {
-                                                                        newPermissions.push(p);
-                                                                    }
-                                                                });
-                                                                setFieldValue('permissions', newPermissions);
-                                                            }
-                                                        }}
+                                                        onClick={() => toggleCategory(key, values, setFieldValue)}
                                                     >
-                                                        {Object.keys(permissions[key]?.keys ?? {})
-                                                            .map((pkey) => `${key}.${pkey}`)
-                                                            .every((p) => values.permissions.includes(p))
-                                                            ? 'Deselect All'
-                                                            : 'Select All'}
+                                                        {isCategoryAllSelected(key) ? 'Deselect All' : 'Select All'}
                                                     </Button>
                                                 )}
                                             </div>
 
                                             <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                                                {Object.keys(permissions[key]?.keys ?? {}).map((pkey) => (
+                                                {getCategoryKeys(key).map((pkey) => (
                                                     <PermissionRow
                                                         key={`permission_${key}.${pkey}`}
                                                         permission={`${key}.${pkey}`}
                                                         disabled={
                                                             !canEditUser ||
-                                                            editablePermissions.indexOf(`${key}.${pkey}`) < 0
+                                                            !editablePermissions.includes(`${key}.${pkey}`)
                                                         }
                                                     />
                                                 ))}
@@ -287,7 +253,6 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
                         <Can action={subuser ? 'user.update' : 'user.create'}>
                             <div className='flex gap-3 justify-end pt-4 border-t border-[#ffffff12]'>
                                 <Button variant='secondary' type='button' onClick={onCancel}>
@@ -299,7 +264,8 @@ const UserFormComponent = ({ subuser, onSuccess, onCancel, flashKey, isSubmittin
                             </div>
                         </Can>
                     </Form>
-                )}
+                );
+                }}
             </Formik>
         </>
     );
