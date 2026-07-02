@@ -19,7 +19,7 @@ const PageContentBlock: React.FC<PageContentBlockProps> = ({
 }) => {
     useEffect(() => {
         if (title) {
-            document.title = title + ' | Pyrodactyl';
+            document.title = title + ' | Hydrodactyl';
         }
     }, [title]);
 

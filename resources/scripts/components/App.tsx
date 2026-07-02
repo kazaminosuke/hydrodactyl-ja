@@ -18,7 +18,7 @@ import { store } from '@/state';
 import { ServerContext } from '@/state/server';
 import type { SiteSettings } from '@/state/settings';
 
-import PyrodactylProvider from './PyrodactylProvider';
+import HydrodactylProvider from './HydrodactylProvider';
 
 // const DashboardRouter = lazy(() => import('@/routers/DashboardRouter'));
 // const ServerRouter = lazy(() => import('@/routers/ServerRouter'));
@@ -63,7 +63,7 @@ const App = () => {
         <>
             <GlobalStylesheet />
             <StoreProvider store={store}>
-                <PyrodactylProvider>
+                <HydrodactylProvider>
                     <div
                         data-pyro-routerwrap=''
                         className='relative w-full h-full flex flex-row p-2 overflow-hidden rounded-lg'
@@ -116,7 +116,7 @@ const App = () => {
                             </Routes>
                         </BrowserRouter>
                     </div>
-                </PyrodactylProvider>
+                </HydrodactylProvider>
             </StoreProvider>
         </>
     );

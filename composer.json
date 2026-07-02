@@ -5,7 +5,7 @@
     "authors": [
         {
             "name": "Naterfute",
-            "email": "naterfute@hydrodactyl.dev",
+            "email": "naterfute@blueprint.zip",
             "homepage": "https://naterfute.dev",
             "role": "Maintainer"
         }
@@ -62,7 +62,7 @@
         "files": ["app/helpers.php"],
         "psr-4": {
             "Pterodactyl\\": "app/",
-            "Pyrodactyl\\": "app/",
+            "Hydrodactyl\\": "app/",
             "Database\\Factories\\": "database/Factories/",
             "Database\\Seeders\\": "database/Seeders/"
         }
@@ -70,7 +70,7 @@
     "autoload-dev": {
         "psr-4": {
             "Pterodactyl\\Tests\\": "tests/",
-            "Pyrodactyl\\Tests\\": "tests/"
+            "Hydrodactyl\\Tests\\": "tests/"
         }
     },
     "config": {
