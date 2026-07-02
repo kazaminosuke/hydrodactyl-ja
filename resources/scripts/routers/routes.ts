@@ -27,7 +27,7 @@ import NetworkContainer from '@/components/server/network/NetworkContainer';
 import ServerActivityLogContainer from '@/components/server/ServerActivityLogContainer';
 import ScheduleContainer from '@/components/server/schedules/ScheduleContainer';
 import SettingsContainer from '@/components/server/settings/SettingsContainer';
-import ShellContainer from '@/components/server/shell/ShellContainer';
+import SoftwareContainer from '@/components/server/software/SoftwareContainer';
 import StartupContainer from '@/components/server/startup/StartupContainer';
 import CreateUserContainer from '@/components/server/users/CreateUserContainer';
 import EditUserContainer from '@/components/server/users/EditUserContainer';
@@ -249,7 +249,7 @@ const routes: Routes = {
             path: 'shell',
             permission: 'startup.software',
             name: 'Software',
-            component: ShellContainer,
+            component: SoftwareContainer,
             icon: Box,
             end: true,
         },
