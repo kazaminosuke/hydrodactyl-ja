@@ -8,6 +8,21 @@
   <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
   <meta name="_token" content="{{ csrf_token() }}">
 
+  @php
+    $_favType = config('app.logo.type');
+    $_favVal = config('app.logo.value');
+    if ($_favType === 'upload' && $_favVal) {
+      $_favUrl = url('storage/' . $_favVal);
+    } elseif ($_favType === 'link' && $_favVal) {
+      $_favUrl = $_favVal;
+    } else {
+      $_favUrl = null;
+    }
+  @endphp
+  @if($_favUrl)
+  <link rel="icon" href="{{ $_favUrl }}" />
+  <link rel="apple-touch-icon" href="{{ $_favUrl }}" />
+  @endif
   <link rel="icon" type="image/png" href="/favicons/favicon-96x96.png" sizes="96x96" />
   <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
   <link rel="shortcut icon" href="/favicons/favicon.ico" />
@@ -21,7 +36,9 @@
   @include('layouts.scripts')
 
   @section('scripts')
+  @if(file_exists(public_path('build/manifest.json')))
   @vite('resources/scripts/admin/index.tsx')
+  @endif
   {!! Theme::css('vendor/select2/select2.min.css?t={cache-version}') !!}
   {!! Theme::css('vendor/bootstrap/bootstrap.min.css?t={cache-version}') !!}
   {!! Theme::css('vendor/adminlte/admin.min.css?t={cache-version}') !!}
@@ -48,28 +65,28 @@
           $logoType = config('app.logo.type');
           $logoValue = config('app.logo.value');
         @endphp
-        <span class="logo-mini" style="display:flex;align-items:center;justify-content:center;height:50px;">
+        <span class="logo-mini">
           @if($logoType === 'upload' && $logoValue)
-            <img src="{{ url('storage/' . $logoValue) }}" alt="{{ config('app.name', 'Panel') }}" style="max-height:36px;width:auto;display:block;">
+            <img src="{{ url('storage/' . $logoValue) }}" alt="{{ config('app.name', 'Panel') }}" style="max-height:30px;vertical-align:middle;">
           @elseif($logoType === 'link' && $logoValue)
-            <img src="{{ $logoValue }}" alt="{{ config('app.name', 'Panel') }}" style="max-height:36px;width:auto;display:block;">
+            <img src="{{ $logoValue }}" alt="{{ config('app.name', 'Panel') }}" style="max-height:30px;vertical-align:middle;">
           @else
-            <svg width="36" height="33" viewBox="0 0 100 92" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+            <svg width="30" height="28" viewBox="0 0 100 92" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;">
                 <path d="M35.1293 92L39.2242 59.3897L44.8276 60.4695L14.2241 81.2019L0 57.0141L32.7586 45.3521V47.7277L0 33.4742L14.2241 8.85446L45.6896 33.2582L39.2242 34.1221L34.4828 0H65.5172L61.4225 33.9061L56.681 32.8263L85.7759 8.85446L100 33.4742L66.1638 47.7277V45.5681L99.569 57.0141L85.3448 81.2019L57.5431 59.3897H61.638L66.1638 92H35.1293Z" fill="#52A9FF" />
             </svg>
           @endif
         </span>
-        <span class="logo-lg" style="display:flex;align-items:center;height:50px;padding:0 15px;">
+        <span class="logo-lg">
           @if($logoType === 'upload' && $logoValue)
-            <img src="{{ url('storage/' . $logoValue) }}" alt="" style="max-height:36px;width:auto;margin-right:8px;flex-shrink:0;">
+            <img src="{{ url('storage/' . $logoValue) }}" alt="" style="max-height:30px;vertical-align:middle;margin-right:6px;">
           @elseif($logoType === 'link' && $logoValue)
-            <img src="{{ $logoValue }}" alt="" style="max-height:36px;width:auto;margin-right:8px;flex-shrink:0;">
+            <img src="{{ $logoValue }}" alt="" style="max-height:30px;vertical-align:middle;margin-right:6px;">
           @else
-            <svg width="36" height="33" viewBox="0 0 100 92" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:8px;flex-shrink:0;">
+            <svg width="30" height="28" viewBox="0 0 100 92" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:6px;">
                 <path d="M35.1293 92L39.2242 59.3897L44.8276 60.4695L14.2241 81.2019L0 57.0141L32.7586 45.3521V47.7277L0 33.4742L14.2241 8.85446L45.6896 33.2582L39.2242 34.1221L34.4828 0H65.5172L61.4225 33.9061L56.681 32.8263L85.7759 8.85446L100 33.4742L66.1638 47.7277V45.5681L99.569 57.0141L85.3448 81.2019L57.5431 59.3897H61.638L66.1638 92H35.1293Z" fill="#52A9FF" />
             </svg>
           @endif
-          <b style="font-size:16px;line-height:1.2;">{{ config('app.name', 'Hydrodactyl') }}</b>
+          <b>{{ config('app.name', 'Hydrodactyl') }}</b>
         </span>
       </a>
       <nav class="navbar navbar-static-top">

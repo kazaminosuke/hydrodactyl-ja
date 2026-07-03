@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { useState, useEffect, useCallback } from 'react';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer,
+  ResponsiveContainer,
   BarChart, Bar, XAxis, Tooltip,
 } from 'recharts';
 
@@ -39,56 +39,24 @@ function formatUptime(seconds: number): string {
 
 const COLORS = { used: '#52A9FF', free: '#2D5A8A', bg: '#1E3A5A' };
 
-function DonutChart({ value, label, unit }: { value: number; label: string; unit: string }) {
-  const data = [
-    { name: 'Used', value },
-    { name: 'Free', value: 100 - value },
-  ];
-
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <ResponsiveContainer width="100%" height={140}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={40}
-            outerRadius={58}
-            startAngle={90}
-            endAngle={-270}
-            dataKey="value"
-            stroke="none"
-          >
-            <Cell fill={COLORS.used} />
-            <Cell fill={COLORS.bg} />
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
-      <div style={{ marginTop: -90, fontSize: 22, fontWeight: 700, color: '#eee' }}>
-        {value.toFixed(1)}<span style={{ fontSize: 14, color: '#999' }}>{unit}</span>
-      </div>
-      <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{label}</div>
-    </div>
-  );
-}
-
-function UsageBar({ used, total, label }: { used: number; total: number; label: string }) {
+function UsageBar({ used, total, label, unit }: { used: number; total: number; label: string; unit?: string }) {
   const pct = total > 0 ? (used / total) * 100 : 0;
   const data = [{ name: label, used, free: total - used }];
+  const isPercent = unit === '%';
+  const fmt = (v: number) => isPercent ? `${v.toFixed(1)}%` : formatBytes(v);
 
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#ccc', marginBottom: 4 }}>
         <span>{label}</span>
-        <span>{formatBytes(used)} / {formatBytes(total)}</span>
+        <span>{fmt(used)} / {fmt(total)}</span>
       </div>
       <ResponsiveContainer width="100%" height={30}>
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <XAxis type="number" hide domain={[0, total]} />
           <Tooltip
             contentStyle={{ background: '#222', border: '1px solid #444', borderRadius: 6, fontSize: 12 }}
-            formatter={(v: number) => formatBytes(v)}
+            formatter={(v: number) => fmt(v)}
           />
           <Bar dataKey="used" fill={COLORS.used} radius={[4, 0, 0, 4]} stackId="a" maxBarSize={24} />
           <Bar dataKey="free" fill={COLORS.bg} radius={[0, 4, 4, 0]} stackId="a" maxBarSize={24} />
@@ -150,7 +118,7 @@ function AdminDashboard() {
       <div className="row">
         <div className="col-md-3 col-sm-6 col-xs-12">
           <div className="small-box" style={{ background: '#1a1a1a', borderRadius: 6, padding: 16, minHeight: 180, maxHeight: 180, overflow: 'hidden' }}>
-            <DonutChart value={metrics.cpu} label="CPU Usage" unit="%" />
+            <UsageBar used={metrics.cpu} total={100} label="CPU" unit="%" />
           </div>
         </div>
         <div className="col-md-3 col-sm-6 col-xs-12">
