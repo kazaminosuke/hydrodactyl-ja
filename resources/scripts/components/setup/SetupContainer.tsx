@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { object, string } from 'yup';
 
 import setupAdmin from '@/api/auth/setup';
-import Button from '@/components/elements/Button';
+import { Button } from '@/components/ui/button';
 import Field from '@/components/elements/Field';
 import FlashMessageRender from '@/components/FlashMessageRender';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,7 @@ const schema = object().shape({
     password: string().required('A password is required.').min(8, 'Use at least 8 characters.'),
     password_confirmation: string()
         .required('Please confirm your password.')
-        .test('password-match', 'Passwords do not match.', function (v) {
+        .test('password-match', 'Passwords do not match.', function(v) {
             // Let .required() own the empty case so only one message shows.
             if (!v) return true;
             return v === this.parent.password;
@@ -334,6 +334,7 @@ const SetupContainer = () => {
                                 {step > 0 ? (
                                     <Button
                                         type='button'
+                                        variant='secondary'
                                         onClick={back}
                                         disabled={isSubmitting}
                                         className='text-secondary hover:text-cream-200 rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-40'
@@ -347,14 +348,9 @@ const SetupContainer = () => {
                                     <Button
                                         key='advance'
                                         type='button'
+                                        variant='attention'
                                         onClick={advance}
                                         disabled={isSubmitting}
-                                        className={cn(
-                                            'rounded-lg px-5 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50',
-                                            ready
-                                                ? 'bg-brand hover:bg-brand-600 text-white shadow-[0_0_24px_-4px_rgba(250,78,73,0.55)] hover:shadow-[0_0_30px_-2px_rgba(250,78,73,0.7)]'
-                                                : 'bg-mocha-100 hover:bg-mocha-200 text-black',
-                                        )}
                                     >
                                         {step === 0 ? 'Get started' : 'Continue'}
                                     </Button>
@@ -362,15 +358,10 @@ const SetupContainer = () => {
                                     <Button
                                         key='submit'
                                         type='button'
+                                        variant='attention'
                                         onClick={handleSubmit}
                                         isLoading={isSubmitting}
                                         disabled={isSubmitting}
-                                        className={cn(
-                                            'rounded-lg px-5 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50',
-                                            ready
-                                                ? 'bg-brand hover:bg-brand-600 text-white shadow-[0_0_24px_-4px_rgba(250,78,73,0.55)] hover:shadow-[0_0_30px_-2px_rgba(250,78,73,0.7)]'
-                                                : 'bg-mocha-100 hover:bg-mocha-200 text-black',
-                                        )}
                                     >
                                         Create admin account
                                     </Button>
