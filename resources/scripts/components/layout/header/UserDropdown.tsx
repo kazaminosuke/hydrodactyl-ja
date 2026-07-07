@@ -129,7 +129,12 @@ export default function UserDropdown({ serverId }: UserDropdownProps) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant={'secondary'} size={'sm'} className='px-1 gap-1 rounded-full'>
+                <Button
+                    variant={'secondary'}
+                    size={'sm'}
+                    aria-label='Account menu'
+                    className='h-11 sm:h-8 px-2 sm:px-3 gap-1 rounded-full'
+                >
                     <div className='flex flex-row items-center gap-1.5'>
                         <div className='grid aspect-square size-5 place-content-center overflow-hidden rounded-full border border-mocha-400 bg-mocha-400'>
                             <img
@@ -139,9 +144,9 @@ export default function UserDropdown({ serverId }: UserDropdownProps) {
                                 draggable={false}
                             />
                         </div>
-                        {email}
+                        <span className='hidden sm:inline max-w-[140px] truncate'>{email}</span>
                     </div>
-                    <HugeiconsIcon size={16} strokeWidth={2} icon={ArrowDown01Icon} />
+                    <HugeiconsIcon size={16} strokeWidth={2} icon={ArrowDown01Icon} className='hidden sm:inline' />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className='z-99999' sideOffset={8}>

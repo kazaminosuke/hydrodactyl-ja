@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import type { Server } from '@/api/server/getServer';
@@ -18,6 +18,10 @@ display: flex;
 align-items: center;
 justify-content: space-between;
 position: relative;
+
+    @media (max-width: 639px) {
+        padding: 1rem 1.25rem;
+    }
 
     &:hover {
     border: 1px solid #ffffff11;
@@ -59,18 +63,20 @@ position: relative;
     }
 `;
 
-type Timer = ReturnType<typeof setInterval>;
-
 const ServerRow = ({ server, className }: { server: Server; className?: string }) => {
-    const interval = useRef<Timer>(null) as React.MutableRefObject<Timer>;
     const [isSuspended, setIsSuspended] = useState(server.status === 'suspended');
     const [isInstalling, setIsInstalling] = useState(server.status === 'installing');
     const [stats, setStats] = useState<ServerStats | null>(null);
 
-    const getStats = () =>
+    // Memoized so its identity is stable across renders. Using an inline function
+    // here as a useEffect dependency makes the polling effect re-fire every render
+    // -> setStats -> re-render -> re-fire, i.e. a setState-in-useEffect infinite
+    // loop ("Maximum update depth exceeded").
+    const getStats = useCallback(() => {
         getServerResourceUsage(server.uuid)
             .then((data) => setStats(data))
             .catch((error) => console.error(error));
+    }, [server.uuid]);
 
     useEffect(() => {
         setIsSuspended(stats?.isSuspended || server.status === 'suspended');
@@ -85,14 +91,10 @@ const ServerRow = ({ server, className }: { server: Server; className?: string }
         // the server is suspended.
         if (isSuspended) return;
 
-        getStats().then(() => {
-            interval.current = setInterval(() => getStats(), 30000);
-        });
+        getStats();
+        const interval = setInterval(getStats, 30000);
 
-        return () => {
-            if (interval.current) clearInterval(interval.current);
-        };
-        // biome-ignore lint/correctness/useExhaustiveDependencies: getStats is intentionally recreated each render
+        return () => clearInterval(interval);
     }, [isSuspended, getStats]);
 
     const alarms = { cpu: false, memory: false, disk: false };
@@ -109,13 +111,15 @@ const ServerRow = ({ server, className }: { server: Server; className?: string }
             className={`${className} bg-mocha-500 hover:bg-mocha-400 border border-[1px] border-mocha-400 hover:border-mocha-400`}
             $status={stats?.status || 'offline'}
         >
-            <div className={`flex items-center`}>
-                <div className='flex flex-col'>
-                    <div className='flex items-center gap-2'>
-                        <p className={`text-xl tracking-tight font-bold truncate max-w-[20vw]`}>{server.name}</p>{' '}
+            <div className={`flex items-center min-w-0`}>
+                <div className='flex flex-col min-w-0'>
+                    <div className='flex items-center gap-2 min-w-0'>
+                        <p className={`text-xl tracking-tight font-bold truncate min-w-0 max-w-full sm:max-w-[20vw]`}>
+                            {server.name}
+                        </p>{' '}
                         <div className={'status-bar'} />
                     </div>
-                    <p className={`text-sm text-[#ffffff66]`}>
+                    <p className={`text-sm text-[#ffffff66] truncate`}>
                         {server.allocations
                             .filter((alloc) => alloc.isDefault)
                             .map((allocation) => (

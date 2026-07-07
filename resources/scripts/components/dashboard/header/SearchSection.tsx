@@ -1,6 +1,6 @@
 import { Search01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, memo, useEffect, useRef, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
 import { KeyboardShortcut } from '@/components/ui/keyboard-shortcut';
@@ -17,12 +17,14 @@ SearchIcon.displayName = 'SearchIcon';
 
 interface SearchSectionProps {
     className?: string;
+    onSearch?: (value: string) => void;
 }
 
-const SearchSection = memo(({ className }: SearchSectionProps) => {
+const SearchSection = memo(({ className, onSearch }: SearchSectionProps) => {
     const [searchValue, setSearchValue] = useState('');
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const inputRef = useRef(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -39,6 +41,27 @@ const SearchSection = memo(({ className }: SearchSectionProps) => {
         };
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, []);
+
+    const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchValue(value);
+
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+
+        debounceRef.current = setTimeout(() => {
+            onSearch?.(value);
+        }, 300);
+    };
+
     return (
         <div className={`flex items-center gap-2 h-full group ${className || ''}`}>
             <div className='relative w-3/4 transition-all duration-200 ease-out group group-focus-within:w-full mx-auto'>
@@ -48,9 +71,7 @@ const SearchSection = memo(({ className }: SearchSectionProps) => {
                     type='text'
                     placeholder='Search servers...'
                     value={searchValue}
-                    onChange={(e) => {
-                        setSearchValue(e.target.value);
-                    }}
+                    onChange={handleChange}
                     className='pl-10 pr-16 mx-auto w-full group-focus-within:w-full transition-all duration-200 ease-out '
                 />
                 <SearchIcon />

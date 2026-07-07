@@ -89,7 +89,7 @@ const AppHeader = ({ serverId }: AppHeaderProps) => {
                 <MobileSidebarToggle />
                 <SidebarLogo />
             </div>
-            <div className='flex items-center gap-2 h-full w-full justify-end'>
+            <div className='flex items-center gap-1.5 sm:gap-2 h-full w-full justify-end min-w-0'>
                 <HeaderActions />
                 <StaticButtons serverId={serverId} />
             </div>

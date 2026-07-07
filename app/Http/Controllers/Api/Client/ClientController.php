@@ -2,24 +2,22 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
+use Illuminate\Support\Facades\DB;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Permission;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Pterodactyl\Models\Filters\MultiFieldServerFilter;
+use Pterodactyl\Models\Sorts\ServerOwnerNameSort;
+use Pterodactyl\Models\Sorts\ServerNestNameSort;
+use Pterodactyl\Models\Sorts\ServerEggNameSort;
+use Pterodactyl\Models\Sorts\ServerNodeNameSort;
 use Pterodactyl\Transformers\Api\Client\ServerTransformer;
 use Pterodactyl\Http\Requests\Api\Client\GetServersRequest;
 
 class ClientController extends ClientApiController
 {
-    /**
-     * ClientController constructor.
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
     /**
      * Return all the servers available to the client making the API
      * request, including servers the user has access to as a subuser.
@@ -38,7 +36,34 @@ class ClientController extends ClientApiController
             'description',
             'external_id',
             'daemonType',
+            // Foreign-key columns must use exact matching: Spatie turns a bare
+            // string filter into AllowedFilter::partial() (LIKE '%value%'), which
+            // would make filter[owner_id]=5 also match 15, 25, 50-59, … — returning
+            // servers that don't belong to the selected owner/nest/egg/node.
+            AllowedFilter::exact('owner_id'),
+            AllowedFilter::exact('nest_id'),
+            AllowedFilter::exact('egg_id'),
+            AllowedFilter::exact('node_id'),
             AllowedFilter::custom('*', new MultiFieldServerFilter()),
+        ])->allowedSorts([
+            'name',
+            'uuid',
+            'uuidShort',
+            'description',
+            'status',
+            'owner_id',
+            'nest_id',
+            'egg_id',
+            'node_id',
+            'memory',
+            'disk',
+            'cpu',
+            'created_at',
+            'updated_at',
+            AllowedSort::custom('owner_name', new ServerOwnerNameSort()),
+            AllowedSort::custom('nest_name', new ServerNestNameSort()),
+            AllowedSort::custom('egg_name', new ServerEggNameSort()),
+            AllowedSort::custom('node_name', new ServerNodeNameSort()),
         ]);
 
         $type = $request->input('type');
@@ -58,16 +83,84 @@ class ClientController extends ClientApiController
             }
         } elseif ($type === 'owner') {
             $builder = $builder->where('servers.owner_id', $user->id);
-        } elseif ($type === 'all') {
-            // Yes, I'm well aware this and the one below it are the same function, shut Up, I know. it's not a bug
-            $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+        } elseif ($type === 'shared') {
+            $builder = $builder->whereIn('servers.id', function ($q) use ($user) {
+                $q->select('server_id')->from('subusers')->where('user_id', $user->id);
+            });
         } else {
+            // Default + 'all': every server the user can access (owned + subuser on).
             $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
         }
 
-        $servers = $builder->paginate(min($request->query('per_page', 50), 100))->appends($request->query());
+        $servers = $builder->paginate(min($request->query('per_page', 50), 1000))->appends($request->query());
 
         return $this->fractal->transformWith($transformer)->collection($servers)->toArray();
+    }
+
+    /**
+     * Returns distinct filter options (owners, nests, eggs, nodes) for servers
+     * accessible to the current user. Used to populate the category filter dropdown.
+     */
+    public function filterOptions(GetServersRequest $request): array
+    {
+        $user = $request->user();
+
+        $baseQuery = Server::query();
+        if (!$user->root_admin) {
+            $baseQuery->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+        }
+
+        $accessibleIds = (clone $baseQuery)->select('servers.id');
+
+        $owners = Server::query()
+            ->from('servers')
+            ->leftJoin('users', 'servers.owner_id', '=', 'users.id')
+            ->whereIn('servers.id', clone $accessibleIds)
+            ->whereNotNull('users.id')
+            ->select('users.id as value', DB::raw("CONCAT(users.name_first, ' ', users.name_last) as label"))
+            ->distinct()
+            ->orderBy('label')
+            ->get();
+
+        $nests = Server::query()
+            ->from('servers')
+            ->leftJoin('nests', 'servers.nest_id', '=', 'nests.id')
+            ->whereIn('servers.id', clone $accessibleIds)
+            ->whereNotNull('nests.id')
+            ->select('nests.id as value', 'nests.name as label')
+            ->distinct()
+            ->orderBy('label')
+            ->get();
+
+        $eggs = Server::query()
+            ->from('servers')
+            ->leftJoin('eggs', 'servers.egg_id', '=', 'eggs.id')
+            ->whereIn('servers.id', clone $accessibleIds)
+            ->whereNotNull('eggs.id')
+            ->select('eggs.id as value', 'eggs.name as label')
+            ->distinct()
+            ->orderBy('label')
+            ->get();
+
+        $nodes = Server::query()
+            ->from('servers')
+            ->leftJoin('nodes', 'servers.node_id', '=', 'nodes.id')
+            ->whereIn('servers.id', clone $accessibleIds)
+            ->whereNotNull('nodes.id')
+            ->select('nodes.id as value', 'nodes.name as label')
+            ->distinct()
+            ->orderBy('label')
+            ->get();
+
+        return [
+            'object' => 'server_filter_options',
+            'attributes' => [
+                'owners' => $owners,
+                'nests' => $nests,
+                'eggs' => $eggs,
+                'nodes' => $nodes,
+            ],
+        ];
     }
 
     /**

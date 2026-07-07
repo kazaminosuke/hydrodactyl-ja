@@ -1,9 +1,9 @@
-import { ArrowDown01Icon, FilterIcon } from '@hugeicons/core-free-icons';
-import { HugeiconsIcon } from '@hugeicons/react';
 import { useStoreState } from 'easy-peasy';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import useSWR from 'swr';
+import useSWRImmutable from 'swr/immutable';
+import getFilterOptions from '@/api/getFilterOptions';
 import getServers from '@/api/getServers';
 import type { PaginatedResult } from '@/api/http';
 import type { Server } from '@/api/server/getServer';
@@ -11,20 +11,33 @@ import ServerRow from '@/components/dashboard/ServerRow';
 import PageContentBlock from '@/components/elements/PageContentBlock';
 import Pagination from '@/components/elements/Pagination';
 import { Tabs, TabsList, TabsTrigger } from '@/components/elements/Tabs';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useHeader } from '@/contexts/HeaderContext';
 
 import useFlash from '@/plugins/useFlash';
 import { usePersistedState } from '@/plugins/usePersistedState';
 
-import { Button } from '../ui/button';
+import FilterDropdown from './header/FilterDropdown';
 import HeaderCentered from './header/HeaderCentered';
+import OwnerFilterDropdown, { type OwnerFilterValue } from './header/OwnerFilterDropdown';
 import SearchSection from './header/SearchSection';
+import SortDropdown, { type SortPreset } from './header/SortDropdown';
+
+const SORT_PRESETS: SortPreset[] = [
+    { value: 'name', label: 'A → Z' },
+    { value: '-name', label: 'Z → A' },
+    { value: 'created_at', label: 'Oldest → Newest' },
+    { value: '-created_at', label: 'Newest → Oldest' },
+    { value: 'status', label: 'Status ▲' },
+    { value: '-status', label: 'Status ▼' },
+    { value: 'memory', label: 'Memory ↑' },
+    { value: '-memory', label: 'Memory ↓' },
+    { value: 'disk', label: 'Disk ↑' },
+    { value: '-disk', label: 'Disk ↓' },
+    { value: 'cpu', label: 'CPU ↑' },
+    { value: '-cpu', label: 'CPU ↓' },
+];
+
+type FilterCategory = 'owner_id' | 'nest_id' | 'egg_id' | 'node_id';
 
 const DashboardContainer = () => {
     const { search } = useLocation();
@@ -34,11 +47,7 @@ const DashboardContainer = () => {
     const { clearFlashes, clearAndAddHttpError } = useFlash();
     const uuid = useStoreState((state) => state.user.data?.uuid);
     const rootAdmin = useStoreState((state) => state.user.data?.rootAdmin);
-    const [_showOnlyAdmin, setShowOnlyAdmin] = usePersistedState(`${uuid}:show_all_servers`, false);
-    const [serverViewMode, setServerViewMode] = usePersistedState<'owner' | 'admin-all' | 'all'>(
-        `${uuid}:server_view_mode`,
-        'owner',
-    );
+    const [ownerFilter, setOwnerFilter] = usePersistedState<OwnerFilterValue>(`${uuid}:server_view_mode`, 'owner');
 
     const { setHeaderActions, clearHeaderActions } = useHeader();
 
@@ -47,30 +56,60 @@ const DashboardContainer = () => {
         'list',
     );
 
-    const getApiType = (): string | undefined => {
-        if (serverViewMode === 'owner') return 'owner'; // Servers the User owns
-        if (serverViewMode === 'admin-all') return 'admin-all'; // All servers(Admin only)
-        if (serverViewMode === 'all') return 'all'; // All servers user has Access too. (Subusers and owned)
-        return undefined;
-    };
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortValue, setSortValue] = useState('');
+    const [filterField, setFilterField] = useState<FilterCategory | undefined>(undefined);
+    const [filterValue, setFilterValue] = useState<number | undefined>(undefined);
+
+    const { data: filterOptions } = useSWRImmutable('server:filter-options', () => getFilterOptions(), {
+        revalidateOnMount: true,
+    });
 
     const { data: servers, error } = useSWR<PaginatedResult<Server>>(
-        ['/api/client/servers', serverViewMode, page],
-        () => getServers({ page, type: getApiType() }),
+        ['/api/client/servers', ownerFilter, page, searchQuery, sortValue, filterField, filterValue],
+        () =>
+            getServers({
+                page,
+                type: ownerFilter,
+                query: searchQuery || undefined,
+                sort: sortValue || undefined,
+                filterField: filterField,
+                filterValue: filterValue,
+            }),
         { revalidateOnFocus: false },
     );
 
-    const _handleFilterToggle = useCallback(() => {
-        setShowOnlyAdmin((s) => !s);
-    }, [setShowOnlyAdmin]);
+    const handleSortChange = useCallback((value: string) => {
+        setSortValue(value);
+        setPage(1);
+    }, []);
+
+    const handleOwnerFilterChange = useCallback(
+        (value: OwnerFilterValue) => {
+            setOwnerFilter(value);
+            setPage(1);
+        },
+        [setOwnerFilter],
+    );
+
+    const handleFilterChange = useCallback((field: FilterCategory | undefined, value: number | undefined) => {
+        setFilterField(field);
+        setFilterValue(value);
+        setPage(1);
+    }, []);
+
+    const handleSearch = useCallback((value: string) => {
+        setSearchQuery(value);
+        setPage(1);
+    }, []);
 
     const searchSection = useMemo(
         () => (
             <HeaderCentered>
-                <SearchSection className='max-w-240 xl:w-[30vw] hidden md:flex ' />
+                <SearchSection className='max-w-240 xl:w-[30vw] hidden md:flex' onSearch={handleSearch} />
             </HeaderCentered>
         ),
-        [],
+        [handleSearch],
     );
 
     const viewTabs = useMemo(
@@ -117,56 +156,46 @@ const DashboardContainer = () => {
         [dashboardDisplayOption, setDashboardDisplayOption],
     );
 
-    const filterDropdown = useMemo(
+    const ownerFilterDropdown = useMemo(
         () => (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        size={'sm'}
-                        variant={'secondary'}
-                        className='px-1 pl-3 gap-1 rounded-full hover:cursor-pointer'
-                    >
-                        <div className='flex flex-row items-center gap-1 '>
-                            <div className='flex flex-row items-center gap-1.5'>
-                                <HugeiconsIcon size={16} strokeWidth={2} icon={FilterIcon} className='size-4' />
-                                Filter
-                            </div>
-                            <HugeiconsIcon size={16} strokeWidth={2} icon={ArrowDown01Icon} />
-                        </div>
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className='flex flex-col gap-1 z-99999 hover:cursor-pointer' sideOffset={8}>
-                    <DropdownMenuItem
-                        onSelect={() => setServerViewMode('owner')}
-                        className={serverViewMode === 'owner' ? 'bg-accent/20' : ''}
-                    >
-                        Your Servers Only
-                    </DropdownMenuItem>
-
-                    {rootAdmin && (
-                        <DropdownMenuItem
-                            onSelect={() => setServerViewMode('admin-all')}
-                            className={serverViewMode === 'admin-all' ? 'bg-accent/20' : ''}
-                        >
-                            All Servers (Admin)
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                        onSelect={() => setServerViewMode('all')}
-                        className={serverViewMode === 'all' ? 'bg-accent/20' : ''}
-                    >
-                        All Servers
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <OwnerFilterDropdown
+                value={ownerFilter ?? 'owner'}
+                rootAdmin={rootAdmin ?? false}
+                onChange={handleOwnerFilterChange}
+            />
         ),
-        [rootAdmin, setServerViewMode, serverViewMode],
+        [ownerFilter, rootAdmin, handleOwnerFilterChange],
+    );
+
+    const entityFilterDropdown = useMemo(
+        () => (
+            <FilterDropdown
+                filterOptions={filterOptions || { owners: [], nests: [], eggs: [], nodes: [] }}
+                activeField={filterField}
+                activeValue={filterValue}
+                onFilterChange={handleFilterChange}
+            />
+        ),
+        [filterOptions, filterField, filterValue, handleFilterChange],
+    );
+
+    const sortDropdown = useMemo(
+        () => <SortDropdown presets={SORT_PRESETS} value={sortValue} onSortChange={handleSortChange} />,
+        [sortValue, handleSortChange],
     );
 
     useEffect(() => {
-        setHeaderActions([searchSection, viewTabs, filterDropdown]);
+        setHeaderActions([searchSection, viewTabs, ownerFilterDropdown, entityFilterDropdown, sortDropdown]);
         return () => clearHeaderActions();
-    }, [setHeaderActions, clearHeaderActions, searchSection, viewTabs, filterDropdown]);
+    }, [
+        setHeaderActions,
+        clearHeaderActions,
+        searchSection,
+        viewTabs,
+        ownerFilterDropdown,
+        entityFilterDropdown,
+        sortDropdown,
+    ]);
 
     useEffect(() => {
         if (!servers) return;
@@ -176,9 +205,6 @@ const DashboardContainer = () => {
     }, [servers]);
 
     useEffect(() => {
-        // Don't use react-router to handle changing this part of the URL, otherwise it
-        // triggers a needless re-render. We just want to track this in the URL incase the
-        // user refreshes the page.
         window.history.replaceState(null, document.title, `/${page <= 1 ? '' : `?page=${page}`}`);
     }, [page]);
 
@@ -233,14 +259,14 @@ const DashboardContainer = () => {
                                 className={`text-center text-sm text-zinc-400 absolute w-full left-1/2 -translate-x-1/2`}
                             >
                                 <p className='max-w-sm mx-auto mb-5'>
-                                    {serverViewMode === 'admin-all'
+                                    {ownerFilter === 'admin-all'
                                         ? 'There are no other servers to display.'
-                                        : serverViewMode === 'all'
+                                        : ownerFilter === 'all'
                                           ? 'No Server Shared With your Account'
                                           : 'There are no servers associated with your account.'}
                                 </p>
                                 <h3 className='text-lg font-medium text-zinc-200 mb-2'>
-                                    {serverViewMode === 'admin-all' ? 'No other servers found' : 'No servers found'}
+                                    {ownerFilter === 'admin-all' ? 'No other servers found' : 'No servers found'}
                                 </h3>
                             </div>
                         )

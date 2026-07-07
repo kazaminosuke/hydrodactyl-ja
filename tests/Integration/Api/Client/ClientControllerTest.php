@@ -330,6 +330,194 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
         $response->assertJsonPath('data.0.attributes.relationships.allocations.data.0.attributes.notes', null);
     }
 
+    public function testServersAreSortedAscendingByName(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Charlie']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Alpha']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Bravo']);
+
+        $response = $this->actingAs($user)->getJson('/api/client?sort=name');
+
+        $response->assertOk();
+        $response->assertJsonCount(3, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'Alpha');
+        $response->assertJsonPath('data.1.attributes.name', 'Bravo');
+        $response->assertJsonPath('data.2.attributes.name', 'Charlie');
+    }
+
+    public function testServersAreSortedDescendingByName(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Charlie']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Alpha']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'Bravo']);
+
+        $response = $this->actingAs($user)->getJson('/api/client?sort=-name');
+
+        $response->assertOk();
+        $response->assertJsonCount(3, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'Charlie');
+        $response->assertJsonPath('data.1.attributes.name', 'Bravo');
+        $response->assertJsonPath('data.2.attributes.name', 'Alpha');
+    }
+
+    public function testServersAreSortedByCreationDate(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        // Insert in this PK order: Alpha, Bravo, Charlie.
+        $alpha = $this->createServerModel(['user_id' => $user->id, 'name' => 'Alpha']);
+        $bravo = $this->createServerModel(['user_id' => $user->id, 'name' => 'Bravo']);
+        $charlie = $this->createServerModel(['user_id' => $user->id, 'name' => 'Charlie']);
+
+        // Assign created_at so ASC order (Charlie, Alpha, Bravo) does NOT match
+        // insertion/PK order (Alpha, Bravo, Charlie) — otherwise a no-op sort
+        // returning rows in PK order would coincidentally satisfy the assertion.
+        $charlie->forceFill(['created_at' => now()->subDays(2)])->save(); // oldest
+        $alpha->forceFill(['created_at' => now()->subDay()])->save(); // middle
+        $bravo->forceFill(['created_at' => now()])->save(); // newest
+
+        $response = $this->actingAs($user)->getJson('/api/client?sort=created_at');
+
+        $response->assertOk();
+        $response->assertJsonCount(3, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'Charlie');
+        $response->assertJsonPath('data.1.attributes.name', 'Alpha');
+        $response->assertJsonPath('data.2.attributes.name', 'Bravo');
+    }
+
+    public function testFilteringByOwnerId(): void
+    {
+        // An admin (type=admin-all) can see servers owned by other users, so the
+        // owner_id filter actually has to discriminate — without it the visible set
+        // is 2; with it the set must narrow to exactly 1. (A non-admin would only
+        // ever see their own server, making the filter a no-op and the test a
+        // false-green.)
+        /** @var User $admin */
+        $admin = User::factory()->create(['root_admin' => true]);
+        /** @var User[] $owners */
+        $owners = User::factory()->times(2)->create();
+
+        $this->createServerModel(['user_id' => $owners[0]->id, 'name' => 'OwnerZero']);
+        $this->createServerModel(['user_id' => $owners[1]->id, 'name' => 'OwnerOne']);
+
+        $unfiltered = $this->actingAs($admin)->getJson('/api/client?type=admin-all');
+        $unfiltered->assertOk();
+        $unfiltered->assertJsonCount(2, 'data');
+
+        $response = $this->actingAs($admin)->getJson(
+            '/api/client?type=admin-all&filter[owner_id]=' . $owners[0]->id
+        );
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'OwnerZero');
+    }
+
+    public function testFilteringByNodeId(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        $server1 = $this->createServerModel(['user_id' => $user->id, 'name' => 'OnNodeA']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'OnNodeB']);
+
+        $response = $this->actingAs($user)->getJson(
+            '/api/client?filter[node_id]=' . $server1->node_id
+        );
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'OnNodeA');
+    }
+
+    public function testSortingCombinedWithEntityFiltering(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        // Create node and allocations manually so both servers share the same node
+        $location = \Pterodactyl\Models\Location::factory()->create();
+        $node = \Pterodactyl\Models\Node::factory()->create(['location_id' => $location->id]);
+
+        $allocation1 = Allocation::factory()->create(['node_id' => $node->id]);
+        $allocation2 = Allocation::factory()->create(['node_id' => $node->id]);
+
+        $this->createServerModel([
+            'user_id' => $user->id,
+            'name' => 'Bravo',
+            'node_id' => $node->id,
+            'allocation_id' => $allocation1->id,
+        ]);
+
+        $this->createServerModel([
+            'user_id' => $user->id,
+            'name' => 'Alpha',
+            'node_id' => $node->id,
+            'allocation_id' => $allocation2->id,
+        ]);
+
+        $response = $this->actingAs($user)->getJson(
+            '/api/client?filter[node_id]=' . $node->id . '&sort=name'
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.attributes.name', 'Alpha');
+        $response->assertJsonPath('data.1.attributes.name', 'Bravo');
+    }
+
+    public function testFilterOptionsEndpointReturnsStructuredData(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        $this->createServerModel(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->getJson('/api/client/filter-options');
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'object',
+            'attributes' => [
+                'owners',
+                'nests',
+                'eggs',
+                'nodes',
+            ],
+        ]);
+        $response->assertJsonPath('object', 'server_filter_options');
+    }
+
+    public function testCustomNameSortCombinedWithAllocationSearchFilter(): void
+    {
+        // Regression for a Postgres-only bug: the custom name sorts used to ORDER BY
+        // a LEFT JOINed column, which conflicts with MultiFieldServerFilter's
+        // GROUP BY servers.id (added by the IP/port search branch) on PostgreSQL,
+        // raising SQLSTATE 42803 -> HTTP 500. MySQL/MariaDB are lenient
+        // (ONLY_FULL_GROUP_BY off), so this only fails on the pgsql CI leg.
+        /** @var User $user */
+        $user = User::factory()->create();
+
+        $server1 = $this->createServerModel(['user_id' => $user->id, 'name' => 'OnPortA']);
+        $this->createServerModel(['user_id' => $user->id, 'name' => 'OnPortB']);
+
+        // sort=owner_name (custom sort) + filter[*]=:PORT (allocation search ->
+        // allocations join + GROUP BY servers.id). Must not 500, must narrow to 1.
+        $response = $this->actingAs($user)->getJson(
+            '/api/client?sort=owner_name&filter[*]=:' . $server1->allocation->port
+        );
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.attributes.name', 'OnPortA');
+    }
+
     public static function filterTypeDataProvider(): array
     {
         return [['admin'], ['admin-all']];
