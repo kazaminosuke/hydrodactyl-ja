@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import CaptchaManager from '@/lib/captcha';
 
@@ -20,6 +20,7 @@ export default function Captcha({
     size = 'flexible',
 }: CaptchaProps) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const widgetIdRef = useRef<string | null>(null);
     const [widgetId, setWidgetId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,20 +37,19 @@ export default function Captcha({
         onExpiredRef.current = onExpired;
     });
 
-    // Stable callback functions that use refs
-    const handleSuccess = (token: string) => {
+    const handleSuccess = useCallback((token: string) => {
         onSuccessRef.current?.(token);
-    };
+    }, []);
 
-    const handleError = (err: unknown) => {
+    const handleError = useCallback((err: unknown) => {
         setError('Captcha verification failed');
         onErrorRef.current?.(err);
-    };
+    }, []);
 
-    const handleExpired = () => {
+    const handleExpired = useCallback(() => {
         setError('Captcha expired');
         onExpiredRef.current?.();
-    };
+    }, []);
 
     useEffect(() => {
         if (!CaptchaManager.isEnabled()) {
@@ -61,27 +61,14 @@ export default function Captcha({
         const initializeCaptcha = async () => {
             if (!containerRef.current) return;
 
-            // Clean up any existing widget first
-            if (widgetId) {
-                CaptchaManager.removeWidget();
-                setWidgetId(null);
-            }
-
-            // Clear the container
-            if (containerRef.current) {
-                containerRef.current.innerHTML = '';
-            }
-
             setIsLoading(true);
             setError(null);
 
             try {
-                // Load the SDK first
                 await CaptchaManager.loadSdk();
 
                 if (!mounted) return;
 
-                // Render the widget
                 const id = await CaptchaManager.renderWidget(containerRef.current, {
                     theme,
                     size,
@@ -90,7 +77,8 @@ export default function Captcha({
                     onExpired: handleExpired,
                 });
 
-                if (mounted) {
+                if (mounted && id) {
+                    widgetIdRef.current = id;
                     setWidgetId(id);
                 }
             } catch (_err) {
@@ -108,12 +96,13 @@ export default function Captcha({
 
         return () => {
             mounted = false;
-            if (widgetId) {
+            if (widgetIdRef.current) {
                 CaptchaManager.removeWidget();
+                widgetIdRef.current = null;
             }
         };
         // biome-ignore lint/correctness/useExhaustiveDependencies: callbacks use refs so they are stable
-    }, [theme, size, widgetId, handleSuccess, handleExpired, handleError]);
+    }, [theme, size, handleSuccess, handleExpired, handleError]);
 
     // Set up event listeners for captcha events
     useEffect(() => {
