@@ -169,10 +169,19 @@ const Console = () => {
         // Add global keydown listener
         document.addEventListener('keydown', handleGlobalKeyDown);
 
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && connected && instance) {
+                terminal.clear();
+                instance.send(SocketRequest.SEND_LOGS);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             document.removeEventListener('keydown', handleGlobalKeyDown);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [handleGlobalKeyDown]);
+    }, [handleGlobalKeyDown, connected, instance, terminal]);
 
     // Auto-focus input on component mount
     useEffect(() => {
